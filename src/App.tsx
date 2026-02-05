@@ -27,7 +27,7 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
-import { Trash2, Plus, Upload, X, Edit, Package, LogOut, ShoppingBag, LayoutDashboard } from 'lucide-react';
+import { Trash2, Plus, Upload, X, Edit, Package, LogOut, ShoppingBag, LayoutDashboard, Menu, Lock, Save, Loader2 } from 'lucide-react';
 
 // --- Types ---
 type ProductColor = {
@@ -148,10 +148,14 @@ export const App = () => {
               
               {user ? (
                  <div className="flex items-center gap-3">
-                   {/* Botão Admin Secreto - Aparece para todos logados neste exemplo, num app real filtraria por email */}
-                   <button onClick={() => window.location.hash = 'admin'} className="text-xs font-bold bg-gray-100 px-3 py-1 rounded-full hover:bg-gray-200">
-                     ADMIN
+                   {/* Botão Admin no Header para facilitar acesso */}
+                   <button 
+                     onClick={() => window.location.hash = 'admin'}
+                     className="hidden md:flex items-center gap-1 text-[10px] font-bold bg-gray-900 text-white px-3 py-1.5 rounded uppercase tracking-wider hover:bg-blue-600 transition-colors"
+                   >
+                     <Lock className="w-3 h-3" /> Admin
                    </button>
+                   
                    <button onClick={() => window.location.hash = 'dashboard'}>
                      <img src={user.photoURL || 'https://placehold.co/100'} className="w-8 h-8 rounded-full border-2 border-black" />
                    </button>
@@ -239,7 +243,21 @@ export const App = () => {
           <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12">
             <div><Logo /><p className="mt-4 text-gray-400 text-sm">Peças essenciais para uma vida em movimento.</p></div>
             <div><h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-gray-500">Ajuda</h4><div className="flex flex-col space-y-2 text-sm text-gray-300"><a href="#" className="hover:text-white">Trocas e Devoluções</a><a href="#" className="hover:text-white">FAQ</a><a href="#" className="hover:text-white">Fale Conosco</a></div></div>
-            <div><h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-gray-500">Institucional</h4><div className="flex flex-col space-y-2 text-sm text-gray-300"><a href="#" className="hover:text-white">Nossa Tecnologia</a><a href="#" className="hover:text-white">Manifesto</a></div></div>
+            <div>
+              <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-gray-500">Institucional</h4>
+              <div className="flex flex-col space-y-2 text-sm text-gray-300"><a href="#" className="hover:text-white">Nossa Tecnologia</a><a href="#" className="hover:text-white">Manifesto</a></div>
+              
+              {/* Botão Admin no Footer - Super Visível Agora */}
+              <div className="mt-8 pt-4 border-t border-gray-800">
+                 <button 
+                   onClick={() => window.location.hash = 'admin'}
+                   className="flex items-center gap-2 text-gray-400 hover:text-white text-xs uppercase font-bold tracking-widest transition-colors"
+                 >
+                   <Lock className="w-4 h-4" /> Área Administrativa
+                 </button>
+              </div>
+
+            </div>
             <div>
               <h4 className="font-bold mb-4 uppercase text-xs tracking-widest text-gray-500">Newsletter</h4>
               <div className="flex"><input type="email" placeholder="Seu e-mail" className="bg-gray-900 border-none px-4 py-2 w-full text-sm rounded-l-lg focus:ring-1 focus:ring-blue-600 outline-none" /><button className="bg-white text-black font-bold px-4 rounded-r-lg text-xs hover:bg-gray-200">OK</button></div>
@@ -304,7 +322,7 @@ const AdminView = ({ user }: any) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja deletar este produto?')) {
+    if (window.confirm('Tem certeza que deseja deletar este produto? Essa ação não pode ser desfeita.')) {
       await deleteDoc(doc(db, "products", id));
     }
   };
@@ -315,23 +333,28 @@ const AdminView = ({ user }: any) => {
     
     setUploadingImg(true);
     try {
+      // Create a reference to 'products/TIMESTAMP_FILENAME'
       const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       
       // Add color variant with this image
-      if (!newColorName) { alert('Digite o nome da cor antes de enviar a foto.'); return; }
+      if (!newColorName) { 
+          alert('Por favor, digite o nome da cor (ex: Preto) antes de enviar a foto.'); 
+          setUploadingImg(false);
+          return; 
+      }
       
       setColors(prev => [...prev, {
         name: newColorName,
         hex: newColorHex,
-        images: [url] // Simplified to 1 image per color for MVP
+        images: [url] // In MVP, 1 image per color variant
       }]);
       setNewColorName(''); // Reset for next add
       
     } catch (err) {
       console.error(err);
-      alert('Erro ao enviar imagem');
+      alert('Erro ao enviar imagem. Verifique se você está logado e tem permissão.');
     } finally {
       setUploadingImg(false);
     }
@@ -366,73 +389,125 @@ const AdminView = ({ user }: any) => {
         await addDoc(collection(db, "products"), productData);
       }
       resetForm();
+      alert('Produto salvo com sucesso!');
     } catch (err) {
       console.error(err);
-      alert('Erro ao salvar');
+      alert('Erro ao salvar no banco de dados.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!user) return <div className="p-20 text-center"><h1 className="text-2xl font-bold">Acesso Negado</h1><p>Faça login para acessar o admin.</p><Button onClick={() => window.location.hash = 'login'} className="mt-4 mx-auto">Ir para Login</Button></div>;
+  if (!user) return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+          <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md w-full">
+              <Lock className="w-12 h-12 mx-auto text-red-500 mb-4" />
+              <h1 className="text-2xl font-black mb-2">Área Restrita</h1>
+              <p className="text-gray-500 mb-6">Você precisa estar logado para acessar o painel administrativo.</p>
+              <Button onClick={() => window.location.hash = 'login'} className="w-full">Ir para Login</Button>
+              <button onClick={() => window.location.hash = ''} className="mt-4 text-sm text-gray-400 hover:text-black">Voltar para Loja</button>
+          </div>
+      </div>
+  );
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Admin Sidebar */}
-      <aside className="w-64 bg-black text-white p-6 flex flex-col hidden md:flex">
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+      
+      {/* Mobile Admin Header */}
+      <div className="md:hidden bg-black text-white p-4 flex justify-between items-center sticky top-0 z-50 shadow-md">
+        <span className="font-bold tracking-tighter flex items-center gap-2"><Lock className="w-4 h-4 text-blue-500"/> ADMIN</span>
+        <div className="flex gap-4">
+           <button onClick={() => setActiveTab('list')} className={activeTab === 'list' ? 'text-blue-400' : 'text-white'}><Package size={24}/></button>
+           <button onClick={() => { resetForm(); setActiveTab('form'); }} className={activeTab === 'form' ? 'text-blue-400' : 'text-white'}><Plus size={24}/></button>
+           <button onClick={() => window.location.hash = ''}><LogOut size={24}/></button>
+        </div>
+      </div>
+
+      {/* Desktop Admin Sidebar */}
+      <aside className="w-64 bg-black text-white p-6 flex flex-col hidden md:flex sticky top-0 h-screen">
         <h2 className="text-2xl font-black tracking-tighter mb-10">MEDFERPA<span className="text-blue-500">.</span><br/><span className="text-xs font-normal text-gray-400 tracking-normal">ADMINISTRATIVO</span></h2>
         <nav className="flex-grow space-y-2">
-          <button onClick={() => setActiveTab('list')} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 ${activeTab === 'list' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}>
+          <button onClick={() => setActiveTab('list')} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'list' ? 'bg-blue-600 text-white' : 'hover:bg-gray-800 text-gray-300'}`}>
             <Package className="w-5 h-5" /> Produtos
           </button>
-          <button onClick={() => { resetForm(); setActiveTab('form'); }} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 ${activeTab === 'form' ? 'bg-blue-600' : 'hover:bg-gray-800'}`}>
+          <button onClick={() => { resetForm(); setActiveTab('form'); }} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeTab === 'form' ? 'bg-blue-600 text-white' : 'hover:bg-gray-800 text-gray-300'}`}>
             <Plus className="w-5 h-5" /> Novo Produto
           </button>
         </nav>
-        <button onClick={() => window.location.hash = ''} className="mt-auto flex items-center gap-2 text-gray-400 hover:text-white">
-          <LogOut className="w-4 h-4" /> Voltar para Loja
-        </button>
+        <div className="mt-auto pt-6 border-t border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+                <img src={user.photoURL} className="w-8 h-8 rounded-full border border-gray-600"/>
+                <div className="text-xs">
+                    <p className="font-bold text-white truncate w-32">{user.displayName}</p>
+                    <p className="text-gray-500">Admin</p>
+                </div>
+            </div>
+            <button onClick={() => window.location.hash = ''} className="flex items-center gap-2 text-gray-400 hover:text-white text-sm">
+            <LogOut className="w-4 h-4" /> Voltar para Loja
+            </button>
+        </div>
       </aside>
 
       {/* Admin Content */}
       <div className="flex-1 overflow-y-auto p-4 md:p-10">
         {activeTab === 'list' && (
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">Gerenciar Produtos ({products.length})</h1>
-              <Button onClick={() => { resetForm(); setActiveTab('form'); }} variant="blue"><Plus className="w-4 h-4" /> Novo</Button>
+              <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Gerenciar Produtos</h1>
+                  <p className="text-gray-500">Gerencie o catálogo da sua loja em tempo real.</p>
+              </div>
+              <Button onClick={() => { resetForm(); setActiveTab('form'); }} variant="blue" className="hidden md:flex shadow-lg shadow-blue-500/30"><Plus className="w-4 h-4" /> Adicionar Novo</Button>
             </div>
             
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <table className="w-full text-left">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Produto</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Preço</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Cores</th>
-                    <th className="p-4 text-xs font-bold text-gray-500 uppercase text-right">Ações</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Produto</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Preço</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">Variantes</th>
+                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Ações</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-gray-100">
                   {products.map(p => (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="p-4 flex items-center gap-3">
-                        <img src={p.colors[0]?.images[0]} className="w-10 h-10 rounded object-cover bg-gray-200" />
-                        <span className="font-bold">{p.name}</span>
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                            <img src={p.colors[0]?.images[0]} className="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <span className="font-bold block text-gray-900">{p.name}</span>
+                          <span className="text-xs text-gray-500 md:hidden">R$ {p.price.toFixed(2)}</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wide text-gray-400 bg-gray-100 px-1 rounded">{p.model}</span>
+                        </div>
                       </td>
-                      <td className="p-4">R$ {p.price.toFixed(2)}</td>
-                      <td className="p-4 flex gap-1">
-                        {p.colors.map((c, i) => (
-                          <div key={i} className="w-4 h-4 rounded-full border shadow-sm" style={{ background: c.hex }} title={c.name} />
-                        ))}
+                      <td className="p-4 hidden md:table-cell font-mono font-medium text-gray-700">R$ {p.price.toFixed(2)}</td>
+                      <td className="p-4 hidden md:table-cell">
+                        <div className="flex gap-1">
+                          {p.colors.map((c, i) => (
+                            <div key={i} className="w-6 h-6 rounded-full border border-gray-200 shadow-sm tooltip" style={{ background: c.hex }} title={c.name} />
+                          ))}
+                        </div>
                       </td>
                       <td className="p-4 text-right space-x-2">
-                        <button onClick={() => handleEdit(p)} className="text-blue-600 hover:text-blue-800"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => handleDelete(p.id!)} className="text-red-600 hover:text-red-800"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleEdit(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(p.id!)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Excluir"><Trash2 className="w-4 h-4" /></button>
                       </td>
                     </tr>
                   ))}
-                  {products.length === 0 && <tr><td colSpan={4} className="p-10 text-center text-gray-400">Nenhum produto cadastrado.</td></tr>}
+                  {products.length === 0 && (
+                      <tr>
+                          <td colSpan={4} className="p-20 text-center">
+                              <div className="flex flex-col items-center text-gray-400">
+                                  <Package className="w-12 h-12 mb-2 opacity-20" />
+                                  <p className="font-medium">Nenhum produto cadastrado.</p>
+                                  <p className="text-sm">Clique em "Adicionar Novo" para começar.</p>
+                              </div>
+                          </td>
+                      </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -440,66 +515,84 @@ const AdminView = ({ user }: any) => {
         )}
 
         {activeTab === 'form' && (
-          <div className="max-w-3xl mx-auto">
-            <h1 className="text-3xl font-bold mb-8">{editingId ? 'Editar Produto' : 'Cadastrar Novo Produto'}</h1>
-            <form onSubmit={handleSave} className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 space-y-6">
+          <div className="max-w-4xl mx-auto animate-in slide-in-from-right duration-500">
+            <div className="flex items-center justify-between mb-6">
+                <h1 className="text-3xl font-bold text-gray-900">{editingId ? 'Editar Produto' : 'Cadastrar Novo Produto'}</h1>
+                <button onClick={() => setActiveTab('list')} className="text-sm text-gray-500 hover:text-black underline">Cancelar</button>
+            </div>
+            
+            <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-3 gap-8">
               
-              <div className="grid grid-cols-2 gap-6">
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Nome do Produto</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={name} onChange={e => setName(e.target.value)} required /></div>
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Preço (R$)</label><input type="number" step="0.01" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={price} onChange={e => setPrice(e.target.value)} required /></div>
-              </div>
-
-              <div><label className="text-xs font-bold text-gray-500 uppercase">Descrição</label><textarea rows={3} className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={description} onChange={e => setDescription(e.target.value)} required /></div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Modelo (Categoria)</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={model} onChange={e => setModel(e.target.value)} /></div>
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Tamanhos (separar por vírgula)</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={sizes} onChange={e => setSizes(e.target.value)} /></div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Badges/Tags</label><input placeholder="ex: NOVO, OFERTA" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={badges} onChange={e => setBadges(e.target.value)} /></div>
-                <div><label className="text-xs font-bold text-gray-500 uppercase">Features</label><input placeholder="ex: Antiodor, Secagem rápida" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={features} onChange={e => setFeatures(e.target.value)} /></div>
-              </div>
-
-              {/* Color & Image Manager */}
-              <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100">
-                <label className="text-sm font-bold text-blue-800 uppercase mb-4 block">Cores & Imagens</label>
-                
-                <div className="flex flex-col md:flex-row gap-4 mb-4 items-end">
-                  <div className="flex-1"><label className="text-xs text-gray-500">Nome da Cor</label><input placeholder="ex: Azul Noturno" className="w-full p-2 bg-white rounded border" value={newColorName} onChange={e => setNewColorName(e.target.value)} /></div>
-                  <div><label className="text-xs text-gray-500">Cor Hex</label><input type="color" className="w-full h-10 p-1 bg-white rounded border cursor-pointer" value={newColorHex} onChange={e => setNewColorHex(e.target.value)} /></div>
-                  <div className="flex-1">
-                    <label className="text-xs text-gray-500">Upload Imagem</label>
-                    <label className={`flex items-center justify-center p-2 border border-dashed rounded cursor-pointer ${uploadingImg ? 'bg-gray-100' : 'bg-white hover:border-blue-500'}`}>
-                      {uploadingImg ? 'Enviando...' : <span className="flex items-center gap-2 text-sm text-gray-600"><Upload className="w-4 h-4" /> Escolher Foto</span>}
-                      <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploadingImg || !newColorName} />
-                    </label>
-                  </div>
-                </div>
-
-                {/* List of added colors */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  {colors.map((c, i) => (
-                    <div key={i} className="relative group bg-white p-2 rounded border shadow-sm">
-                      <img src={c.images[0]} className="w-full h-32 object-cover rounded mb-2" />
-                      <div className="flex items-center gap-2 text-xs font-bold">
-                        <div className="w-4 h-4 rounded-full border" style={{background: c.hex}} />
-                        {c.name}
-                      </div>
-                      <button type="button" onClick={() => setColors(colors.filter((_, idx) => idx !== i))} className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="w-3 h-3" />
-                      </button>
+              {/* Left Column: Basic Info */}
+              <div className="md:col-span-2 space-y-6">
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                    <h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Informações Básicas</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Nome do Produto</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all" value={name} onChange={e => setName(e.target.value)} required placeholder="Ex: Tech T-Shirt" /></div>
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Preço (R$)</label><input type="number" step="0.01" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all" value={price} onChange={e => setPrice(e.target.value)} required placeholder="0.00" /></div>
                     </div>
-                  ))}
-                  {colors.length === 0 && <p className="col-span-4 text-center text-sm text-gray-400 py-4">Adicione pelo menos uma variante de cor e foto.</p>}
-                </div>
+                    <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Descrição</label><textarea rows={4} className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all" value={description} onChange={e => setDescription(e.target.value)} required placeholder="Descreva os detalhes e benefícios do produto..." /></div>
+                  </div>
+
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                    <h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Detalhes & Categorias</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Modelo</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={model} onChange={e => setModel(e.target.value)} placeholder="Ex: Camiseta" /></div>
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Tamanhos (separar por vírgula)</label><input className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={sizes} onChange={e => setSizes(e.target.value)} placeholder="P, M, G, GG" /></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Badges (Tags)</label><input placeholder="Ex: NOVO, OFERTA" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={badges} onChange={e => setBadges(e.target.value)} /></div>
+                        <div><label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Features (Características)</label><input placeholder="Ex: Antiodor, Leve" className="w-full p-3 bg-gray-50 rounded-lg border border-gray-200" value={features} onChange={e => setFeatures(e.target.value)} /></div>
+                    </div>
+                  </div>
               </div>
 
-              <div className="flex gap-4 pt-4 border-t">
-                <Button onClick={() => setActiveTab('list')} variant="secondary">Cancelar</Button>
-                <Button type="submit" variant="primary" disabled={loading} className="flex-1">
-                  {loading ? 'Salvando...' : 'Salvar Produto'}
-                </Button>
+              {/* Right Column: Images/Colors & Save */}
+              <div className="space-y-6">
+                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Imagens & Cores</h3>
+                    <p className="text-xs text-gray-500 mb-4">Adicione cada variante de cor e sua respectiva foto.</p>
+                    
+                    <div className="space-y-3 bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase">Nome da Cor</label>
+                            <input placeholder="Ex: Azul" className="w-full p-2 bg-white rounded border border-gray-300 mb-2" value={newColorName} onChange={e => setNewColorName(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase">Cor (Hex)</label>
+                            <div className="flex items-center gap-2">
+                                <input type="color" className="h-8 w-12 cursor-pointer p-0 border-0 rounded" value={newColorHex} onChange={e => setNewColorHex(e.target.value)} />
+                                <span className="text-xs font-mono">{newColorHex}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Foto do Produto</label>
+                            <label className={`w-full flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${uploadingImg ? 'bg-gray-100 border-gray-300' : 'bg-white border-blue-300 hover:bg-blue-50'}`}>
+                                {uploadingImg ? <Loader2 className="w-6 h-6 animate-spin text-blue-500" /> : <Upload className="w-6 h-6 text-blue-500" />}
+                                <span className="text-xs mt-2 text-gray-500">{uploadingImg ? 'Enviando...' : 'Clique para enviar foto'}</span>
+                                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploadingImg || !newColorName} />
+                            </label>
+                            {!newColorName && <p className="text-[10px] text-red-500 mt-1">* Digite o nome da cor primeiro.</p>}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        {colors.map((c, i) => (
+                            <div key={i} className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-100 group">
+                                <img src={c.images[0]} className="w-10 h-10 object-cover rounded bg-white" />
+                                <div className="flex-grow">
+                                    <p className="text-xs font-bold">{c.name}</p>
+                                    <div className="w-3 h-3 rounded-full border border-gray-300" style={{background: c.hex}}></div>
+                                </div>
+                                <button type="button" onClick={() => setColors(colors.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                            </div>
+                        ))}
+                    </div>
+                 </div>
+
+                 <Button type="submit" variant="primary" disabled={loading} className="w-full shadow-xl shadow-blue-900/10 py-4">
+                    {loading ? <span className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/> Salvando...</span> : <span className="flex items-center gap-2"><Save className="w-4 h-4"/> Salvar Produto</span>}
+                 </Button>
               </div>
 
             </form>
@@ -577,7 +670,12 @@ const HomeView = () => {
                 </div>
               </div>
             ))}
-            {products.length === 0 && <div className="col-span-3 text-center py-20 text-gray-400">Nenhum produto cadastrado no momento.</div>}
+            {products.length === 0 && (
+                <div className="col-span-3 text-center py-20">
+                    <p className="text-gray-400 mb-4">Nenhum produto cadastrado no momento.</p>
+                    <button onClick={() => window.location.hash = 'admin'} className="text-blue-600 font-bold underline">Cadastrar produtos no Admin</button>
+                </div>
+            )}
           </div>
         )}
       </div>
@@ -730,17 +828,14 @@ const LoginView = () => {
           <button onClick={loginGoogle} className="flex-1 flex justify-center py-3 border rounded-xl hover:bg-gray-50 transition-all">
             <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" />
           </button>
-          <button className="flex-1 flex justify-center py-3 border rounded-xl hover:bg-gray-50 transition-all">
-            <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="relative mb-8 text-center"><hr className="border-gray-100" /><span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-xs font-bold text-gray-300 uppercase">Ou e-mail</span></div>
 
         <form className="space-y-4" onSubmit={handleAuth}>
-          <input type="email" placeholder="E-mail" className="w-full p-4 bg-gray-50 border-none rounded-xl text-sm outline-none ring-1 ring-gray-100 focus:ring-black" value={email} onChange={e => setEmail(e.target.value)} required />
-          <input type="password" placeholder="Senha" className="w-full p-4 bg-gray-50 border-none rounded-xl text-sm outline-none ring-1 ring-gray-100 focus:ring-black" value={password} onChange={e => setPassword(e.target.value)} required />
-          <Button className="w-full !py-4" variant="primary">{isLogin ? 'ENTRAR' : 'CADASTRAR'}</Button>
+          <input type="email" placeholder="E-mail" className="w-full p-4 bg-gray-50 border-none rounded-xl text-sm" value={email} onChange={e => setEmail(e.target.value)} required />
+          <input type="password" placeholder="Senha" className="w-full p-4 bg-gray-50 border-none rounded-xl text-sm" value={password} onChange={e => setPassword(e.target.value)} required />
+          <Button className="w-full !py-4" variant="primary" type="submit">{isLogin ? 'ENTRAR' : 'CADASTRAR'}</Button>
         </form>
 
         <p className="text-center mt-6 text-sm">
@@ -771,7 +866,6 @@ const DashboardView = ({ user }: any) => {
         <div className="p-6 text-center mb-6">
           <img src={user.photoURL || 'https://placehold.co/100'} className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-black" />
           <h3 className="font-bold truncate">{user.displayName || user.email}</h3>
-          <button onClick={() => window.location.hash = 'admin'} className="mt-2 text-xs bg-gray-100 px-3 py-1 rounded-full font-bold">Acessar Admin</button>
         </div>
         <button onClick={() => setTab('orders')} className={`w-full text-left px-4 py-3 rounded-lg font-bold text-sm ${tab === 'orders' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}>Meus Pedidos</button>
         <button onClick={() => setTab('profile')} className={`w-full text-left px-4 py-3 rounded-lg font-bold text-sm ${tab === 'profile' ? 'bg-black text-white' : 'hover:bg-gray-100'}`}>Dados Pessoais</button>
@@ -783,10 +877,10 @@ const DashboardView = ({ user }: any) => {
           <div className="space-y-6">
             <h2 className="text-2xl font-extrabold tracking-tighter">MEUS PEDIDOS</h2>
             {orders.length === 0 ? (
-              <div className="p-20 bg-gray-50 rounded-2xl text-center text-gray-400 border border-dashed border-gray-200">Nenhum pedido realizado ainda.</div>
+              <div className="p-20 bg-gray-50 rounded-2xl text-center text-gray-400">Nenhum pedido realizado.</div>
             ) : (
               orders.map(o => (
-                <div key={o.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center transition-shadow hover:shadow-md">
+                <div key={o.id} className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex justify-between items-center">
                   <div>
                     <p className="text-xs font-bold text-gray-400">PEDIDO #{o.orderNumber}</p>
                     <p className="font-extrabold text-lg">R$ {o.total.toFixed(2)}</p>
@@ -801,11 +895,11 @@ const DashboardView = ({ user }: any) => {
           </div>
         )}
         {tab === 'profile' && (
-            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="bg-white p-8 rounded-2xl border border-gray-100">
                 <h2 className="text-2xl font-extrabold tracking-tighter mb-6">DADOS PESSOAIS</h2>
                 <div className="space-y-4">
-                    <div><label className="text-xs font-bold text-gray-400">NOME</label><p className="font-bold border-b py-2">{user.displayName || 'Não informado'}</p></div>
-                    <div><label className="text-xs font-bold text-gray-400">E-MAIL</label><p className="font-bold border-b py-2">{user.email}</p></div>
+                    <div><label className="text-xs font-bold text-gray-400">NOME</label><p className="font-bold">{user.displayName || 'Não informado'}</p></div>
+                    <div><label className="text-xs font-bold text-gray-400">E-MAIL</label><p className="font-bold">{user.email}</p></div>
                 </div>
             </div>
         )}
@@ -832,6 +926,7 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
   }, [step]);
 
   const initMP = () => {
+    if (!(window as any).MercadoPago) return;
     const mp = new (window as any).MercadoPago('APP_USR-786f2d55-857b-4ddf-9d4c-ff1d7a216ea4');
     const bricksBuilder = mp.bricks();
     bricksBuilder.create('payment', 'paymentBrick_container', {
@@ -874,7 +969,7 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
       <div className="flex justify-center space-x-12 mb-12">
           {[1,2,3].map(s => (
               <div key={s} className={`flex items-center space-x-2 ${step >= s ? 'text-blue-600' : 'text-gray-300'}`}>
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors ${step >= s ? 'border-blue-600 bg-blue-50' : 'border-gray-300'}`}>{s}</span>
+                  <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold border-2 ${step >= s ? 'border-blue-600' : 'border-gray-300'}`}>{s}</span>
                   <span className="text-xs font-black uppercase tracking-widest hidden md:inline">{s === 1 ? 'Identificação' : s === 2 ? 'Entrega' : 'Pagamento'}</span>
               </div>
           ))}
@@ -883,7 +978,7 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
         <div className="md:col-span-2 space-y-6">
           {step === 1 && (
-            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-4">
               <h3 className="text-xl font-extrabold tracking-tighter">DADOS PESSOAIS</h3>
               <input type="email" placeholder="E-mail" className="w-full p-4 bg-gray-50 rounded-xl" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
               <input type="text" placeholder="Nome Completo" className="w-full p-4 bg-gray-50 rounded-xl" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
@@ -893,7 +988,7 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
           )}
 
           {step === 2 && (
-            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-4">
               <h3 className="text-xl font-extrabold tracking-tighter">ENTREGA</h3>
               <div className="grid grid-cols-2 gap-4">
                 <input type="text" placeholder="CEP" className="col-span-2 w-full p-4 bg-gray-50 rounded-xl" value={formData.cep} onChange={e => setFormData({...formData, cep: e.target.value})} />
@@ -909,14 +1004,14 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
           )}
 
           {step === 3 && (
-            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
                 <div id="paymentBrick_container"></div>
                 {isProcessing && <p className="text-center font-bold text-blue-600 mt-4 animate-pulse">Processando pedido...</p>}
             </div>
           )}
 
           {step === 4 && (
-              <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center space-y-6 animate-in zoom-in">
+              <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center space-y-6">
                   <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-4xl">✓</div>
                   <h2 className="text-3xl font-extrabold tracking-tighter">PEDIDO REALIZADO!</h2>
                   <p className="text-gray-500">Obrigado por comprar na MedFerpa. Você receberá os detalhes por e-mail.</p>
@@ -927,7 +1022,7 @@ const CheckoutView = ({ cart, user, total, onOrderPlaced }: any) => {
 
         {step < 4 && (
           <aside className="space-y-6">
-            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 sticky top-24">
+            <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
               <h4 className="font-extrabold text-sm uppercase tracking-widest mb-6 border-b pb-4">Resumo</h4>
               <div className="space-y-4 max-h-60 overflow-y-auto pr-2 mb-6">
                 {cart.map((item: any, i: number) => (
